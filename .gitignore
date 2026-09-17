@@ -1,0 +1,29 @@
+# Artefactos de build
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Datos descargados: pesados y reproducibles con datasets/scripts/
+datasets/raw/
+datasets/processed/
+
+# Toolchain local
+android-sdk/
+gradle-*/
+
+# Node
+node_modules/
+
+# Repos externos clonados. Se excluyen del control de versiones por dos
+# motivos: son reproducibles con los comandos de datasets/scripts/, y
+# JD-GenX/Uni-Layout tiene licencia solo-academica que prohibe la
+# redistribucion. Nunca commitear su contenido.
+third_party/

@@ -97,7 +97,15 @@ la demo Android no se puede ver ejecutándose aquí. Lo que sí está verificado
 - la demo web ejecuta el mismo motor portado a JS y sí se verifica en navegador.
 
 El port a JS no es una reimplementación libre: `scripts/check_parity.py` compara
-cuadrantes y geometría contra el Python y falla si divergen.
+cuadrantes y geometría contra el Python y falla si divergen (8 escenarios, 32
+elementos, 32 transiciones, tolerancia 0.05 dp).
+
+La paridad cubre geometría y cuadrantes, pero **no las métricas de calidad**: el
+JS no calcula `composite` ni `prominence_score` (solo solape, cobertura,
+criticidad y ocupación de cuadrantes). Las cifras de calidad del README están
+medidas en Python; reproducirlas en la web y en Android exigiría portar
+`metrics.py`. Mientras no se haga, una divergencia de calidad entre plataformas
+no la detectaría ningún test.
 
 ## 6. Licencias
 
@@ -129,10 +137,10 @@ permisiva, o pedir permiso a JD.COM).
 1. Sustituir `UniLayout-Data` por feedback propio o por Crello/Rico (CC BY 4.0).
 2. Entrenar el reward model multimodal cuando se publiquen los shards.
 3. Levantar un AVD con KVM disponible en otro host y ejecutar la demo Android.
-4. Elegir la política de prominencia al rotar (ver `README_nresponsive.md`). Ya
-   están medidas tres variantes: suben `composite` de 0.613 a ~0.77 pero cuestan
-   entre 37 y 245 dp de deriva en la ida y vuelta. Es una decisión de producto
-   —reversibilidad frente a prominencia—, no una optimización pendiente.
+4. Decidir si se adopta el mapa involutivo al rotar (ver `README_nresponsive.md`).
+   Sobre la ruta que se sirve sube `prominence` de 0.85 a 1.00 con deriva cero y
+   `composite` plano. Cambia dónde aterrizan los elementos al girar, así que la
+   elección es de producto, no de métrica.
 5. Pasar el sentido real de giro desde el sensor de rotación; hoy solo se conoce
    la orientación destino.
 6. El presupuesto de animación queda en 280 ms sobre un criterio de 300 ms. El

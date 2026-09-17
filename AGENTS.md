@@ -71,10 +71,15 @@ background con `nohup` y hacer poll del log.
 
 - **La identidad de ida y vuelta exige que el mapa de cuadrantes sea una
   involución.** Es la razón de que `_rotation_is_clockwise` dependa de la
-  orientación destino y no de dónde cae cada elemento. Cualquier política de
-  prominencia que mire la posición (espejar el dominante, etc.) gana ~0.16 de
-  `composite` pero mete 37-245 dp de deriva. Si alguien la implementa, que sea
-  una decisión de producto consciente, no un "arreglo".
+  orientación destino y no de dónde cae cada elemento. Un mapa fijo involutivo
+  (p. ej. espejo vertical tras rotar) sí sube `prominence` de 0.85 a 1.00 con
+  deriva cero; una regla que mire dónde cae el elemento dominante rompe la
+  simetría y mete cientos de dp de deriva.
+- **Mide sobre la ruta que se sirve, no sobre el motor crudo.** API, Android
+  (`LayoutRepository.local`) y la web reinstancian la plantilla en el canvas
+  destino antes de rotar. Pasar elementos de retrato directamente al motor da
+  cifras pesimistas que no corresponden a ninguna interfaz (0.613 en vez de
+  0.703 de media, prominencia 0.38 en vez de 0.85).
 - **Los tests de ida y vuelta comprobaban solo los elementos críticos**, con
   200 dp de tolerancia, así que no detectaban esas regresiones. Ahora cubren
   todos los elementos con 0.01 dp. No relajar esa tolerancia.

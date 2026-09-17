@@ -198,51 +198,59 @@ lugar de recargar la pantalla.
 
 ## Un trade-off medido, no oculto
 
-Conservar los cuadrantes al girar tiene un coste, y conviene saber cuánto:
+Conservar los cuadrantes al girar tiene un coste, y conviene saber cuánto. Las
+cifras siguientes son de la **ruta que realmente se sirve** (API, Android y web
+reinstancian la plantilla en el canvas destino antes de rotar):
 
 | Plantilla | Vía | `composite` | `prominence_score` |
 | --- | --- | --- | --- |
 | media_player | generación fresca | 0.712 | 1.00 |
-| media_player | rotación | 0.558 | 0.37 |
+| media_player | rotación | 0.635 | 0.85 |
 | dashboard | generación fresca | 0.758 | 1.00 |
-| dashboard | rotación | 0.667 | 0.38 |
-| **media** | **fresca** | **0.735** | 1.00 |
-| **media** | **rotación** | **0.613** | **0.38** |
+| dashboard | rotación | 0.770 | 0.85 |
+| **media** | **fresca** | **0.735** | **1.00** |
+| **media** | **rotación** | **0.703** | **0.85** |
 
-Rotar puntúa ~0.12 menos. La causa es concreta: `prominence_score` premia que el
-elemento más grande esté en el tercio superior, y al rotar el cuadrante el
+Rotar cuesta ~0.03 de `composite` de media, y en `dashboard` incluso puntúa por
+encima de la generación fresca. La causa es concreta: `prominence_score` premia
+que el elemento más grande esté en el tercio superior, y al rotar el cuadrante el
 elemento grande (el `cover` o el `chart`) puede acabar abajo. En el caso medido,
 `cover` pasa de `cy=0.15H` a `cy=0.81H`.
 
-### Intenté recuperarla, y no es gratis
+### Sí se puede recuperar, y es casi gratis
 
-Probé tres políticas de reordenación al girar para subir la prominencia. Las tres
-lo consiguen, y las tres **rompen la identidad de ida y vuelta**:
+En esta ruta la variante involutiva **no rompe la identidad**, al contrario de lo
+que sugería una medición anterior hecha sobre el motor crudo. Medido sobre la
+ruta servida:
 
 | Política | `prominence` | `composite` medio | Deriva ida-vuelta |
 | --- | --- | --- | --- |
-| Base (identidad exacta) | 0.38 | 0.613 | **0.00 dp** |
-| Espejar el dominante si cae abajo | 1.00 | 0.773 | 244.6 dp |
-| Espejar todos los no anclajes | 1.00 | 0.746 | 244.6 dp |
-| Rotar con un mapa que es involución | 1.00 | 0.775 | 36.9 dp |
+| Base (rotación CW) | 0.85 | 0.7025 | **0.00 dp** |
+| Mapa involutivo (espejo vertical tras rotar) | **1.00** | 0.6950 | **0.00 dp** |
+| Mapa NO involutivo (control) | 0.85 | 0.7097 | 316.6 dp |
 
-El motivo es estructural, no un fallo de las variantes: **la identidad exacta
-exige que la transformación sea una involución** (aplicarla dos veces devuelve al
-origen), y cualquier regla que dependa de dónde cae el elemento dominante rompe
-esa simetría al aplicarse en el sentido inverso. Comprobé que la deriva no se
-acumula — se estabiliza tras el primer viaje en 244.56 dp — pero tampoco
-desaparece. Es un intercambio real: **+0.16 de `composite` a cambio de que girar
-dos veces no devuelva la interfaz a su sitio**.
+La variante involutiva sube la prominencia de 0.85 a 1.00 con la misma deriva
+cero y un `composite` prácticamente plano (-0.0075). Es decir: **la mejora de
+prominencia está disponible sin pagar reversibilidad**, siempre que el mapa sea
+una involución. La razón de fondo se mantiene —la identidad de ida y vuelta exige
+que la transformación sea idempotente al aplicarla dos veces, y cualquier regla
+que mire dónde cae el elemento dominante rompe esa simetría—, pero un mapa fijo
+involutivo sí la respeta.
 
-Mantuve la base porque la reversibilidad es un criterio verificable y la mejora
-estética no puedo confirmarla en este entorno. Las tres variantes quedan medidas
-en esta tabla para quien prefiera el otro lado del intercambio. Queda como
-siguiente paso elegir una con criterio de producto, no por métrica.
+**No está adoptada.** Cambia dónde aterrizan los elementos al girar y eso es una
+decisión de producto: el espejo vertical puede no ser lo que espera el usuario.
+La alternativa queda medida arriba para quien la quiera activar.
 
 Un aviso para quien retome esto: **el test de ida y vuelta original no habría
-detectado estas regresiones**, porque solo comparaba elementos críticos con
-tolerancia de 200 dp. Lo endurecí para que cubra todos los elementos con
-tolerancia de 0.01 dp, y verifiqué que falla ante una política inestable.
+detectado las regresiones de las variantes malas**, porque solo comparaba
+elementos críticos con tolerancia de 200 dp. Lo endurecí para que cubra todos los
+elementos con tolerancia de 0.01 dp, y verifiqué que falla ante una política
+inestable (316 dp, cuadrantes no restaurados).
+
+Sobre las mediciones: las cifras anteriores de esta sección (0.613/0.38) medían
+el motor crudo pasando elementos de retrato al canvas de apaisado. Ninguna de las
+tres interfaces funciona así, así que describían una ruta que no existe en
+producción. Corregidas a la ruta servida.
 
 Sobre el sentido de giro: `_rotation_is_clockwise` lo fija por la orientación
 destino, no por el sensor. Es deliberado — así portrait → landscape → portrait es

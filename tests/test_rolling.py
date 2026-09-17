@@ -155,6 +155,49 @@ def test_repeated_rotation_does_not_accumulate_drift(engine, template):
 
 
 # --------------------------------------------------------------------------
+# Ruta servida: las tres interfaces reinstancian la plantilla en el canvas
+# destino antes de rotar. Medir de otra forma da cifras que no corresponden a
+# ningun interfaz, asi que esta ruta queda fijada por test.
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("template", list(TEMPLATES))
+def test_served_route_rotation_is_equivalent_to_reinstantiating(template):
+    """Rotar por la ruta servida == plantilla nativa del destino + previous."""
+    from nresponsive import LayoutGenerator
+
+    gen = LayoutGenerator()
+    portrait, _ = gen.generate(PORTRAIT, template, context={}, previous=None)
+    rotated, _ = gen.generate(LANDSCAPE, template, context={}, previous=portrait)
+
+    # Equivalente: instanciar la plantilla en el canvas destino y pasar el
+    # layout de retrato como anterior.
+    direct = RollingEngine().plan(
+        template_to_elements(template, LANDSCAPE), LANDSCAPE, previous=portrait)
+
+    assert {e.id: e.bounds for e in rotated.elements} == {
+        e.id: e.bounds for e in direct.elements}
+
+
+@pytest.mark.parametrize("template", list(TEMPLATES))
+def test_served_route_rotation_keeps_quality(template):
+    """La ruta servida no hunde las metricas al rotar.
+
+    Fija el suelo medido (prominence >= 0.85, composite >= 0.60) para que una
+    regresion en el generador o en el motor no pase inadvertida.
+    """
+    from nresponsive import LayoutGenerator
+
+    gen = LayoutGenerator()
+    portrait, _ = gen.generate(PORTRAIT, template, context={}, previous=None)
+    rotated, _ = gen.generate(LANDSCAPE, template, context={}, previous=portrait)
+    m = evaluate(rotated.elements, LANDSCAPE)
+
+    assert m.prominence_score >= 0.85, f"prominencia degradada: {m.prominence_score}"
+    assert m.composite() >= 0.60, f"composite degradado: {m.composite()}"
+    assert m.critical_visible, "algun critico quedo fuera del canvas"
+    assert rotated.animation_budget_ms <= 300
+
+
+# --------------------------------------------------------------------------
 # Animacion dentro del presupuesto
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("template", list(TEMPLATES))

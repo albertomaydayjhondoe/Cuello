@@ -28,7 +28,7 @@ demo web necesita ser verificable sin emulador.
 ## Comandos
 
 ```bash
-python3 -m pytest -q                                   # 22 tests
+python3 -m pytest -q                                   # 24 tests
 python3 scripts/check_parity.py                        # Python <-> JS
 cd web && node rotate_check.mjs                        # ruta de rotacion
 python3 -m http.server 12000 --directory web           # demo
@@ -68,6 +68,16 @@ background con `nohup` y hacer poll del log.
   grupo, así que cualquier métrica agrupada se calcula promediando dos números.
   `has_signal` sale `false` y `--mode gate` sale con código 2. Es el resultado
   correcto, no un fallo a arreglar: no bajar `MIN_GROUPS_EVALUATED` para que pase.
+
+- **La identidad de ida y vuelta exige que el mapa de cuadrantes sea una
+  involución.** Es la razón de que `_rotation_is_clockwise` dependa de la
+  orientación destino y no de dónde cae cada elemento. Cualquier política de
+  prominencia que mire la posición (espejar el dominante, etc.) gana ~0.16 de
+  `composite` pero mete 37-245 dp de deriva. Si alguien la implementa, que sea
+  una decisión de producto consciente, no un "arreglo".
+- **Los tests de ida y vuelta comprobaban solo los elementos críticos**, con
+  200 dp de tolerancia, así que no detectaban esas regresiones. Ahora cubren
+  todos los elementos con 0.01 dp. No relajar esa tolerancia.
 
 ## Licencias — leer antes de distribuir
 

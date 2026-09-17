@@ -93,11 +93,34 @@ class RollingEngineTest {
             val back = plan(template, portrait, previous = l)
 
             assertEquals(p.elements.map { it.id }.sorted(), back.elements.map { it.id }.sorted())
-            // Los criticos vuelven a su cuadrante original.
-            p.elements.filter { it.critical }.forEach { original ->
+            // Se comprueban TODOS los elementos, no solo los criticos: los no
+            // criticos son los que se descolocan sin que nadie lo note. Una
+            // politica de cuadrantes dependiente de donde cae el elemento
+            // dominante introduce aqui cientos de dp de deriva.
+            p.elements.forEach { original ->
                 val now = assertNotNull(back.elements.find { it.id == original.id })
-                assertEquals(original.bounds.x, now.bounds.x, 1f, "${original.id} x deriva")
-                assertEquals(original.bounds.y, now.bounds.y, 1f, "${original.id} y deriva")
+                assertEquals(original.bounds.x, now.bounds.x, 0.01f, "${original.id} x deriva")
+                assertEquals(original.bounds.y, now.bounds.y, 0.01f, "${original.id} y deriva")
+                assertEquals(original.quadrant, now.quadrant, "${original.id} cuadrante")
+            }
+        }
+    }
+
+    @Test
+    fun `veinte viajes no acumulan deriva`() {
+        Templates.ALL.keys.forEach { template ->
+            var current = plan(template, portrait)
+            val reference = current.elements.associate { it.id to it.bounds }
+
+            repeat(20) {
+                val l = plan(template, landscape, previous = current)
+                current = plan(template, portrait, previous = l)
+            }
+
+            current.elements.forEach { e ->
+                val ref = assertNotNull(reference[e.id])
+                assertEquals(ref.x, e.bounds.x, 0.01f, "${e.id} x deriva acumulada")
+                assertEquals(ref.y, e.bounds.y, 0.01f, "${e.id} y deriva acumulada")
             }
         }
     }

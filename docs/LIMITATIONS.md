@@ -92,7 +92,7 @@ reward head fiable**.
 la demo Android no se puede ver ejecutándose aquí. Lo que sí está verificado:
 
 - el APK compila (`app-debug.apk`, 7.9 MB);
-- 11 tests JVM puros del motor pasan, incluidos rotación, preservación de
+- 12 tests JVM puros del motor pasan, incluidos rotación, preservación de
   críticos, presupuesto de animación e ida y vuelta sin deriva;
 - la demo web ejecuta el mismo motor portado a JS y sí se verifica en navegador.
 
@@ -129,9 +129,10 @@ permisiva, o pedir permiso a JD.COM).
 1. Sustituir `UniLayout-Data` por feedback propio o por Crello/Rico (CC BY 4.0).
 2. Entrenar el reward model multimodal cuando se publiquen los shards.
 3. Levantar un AVD con KVM disponible en otro host y ejecutar la demo Android.
-4. Recuperar la prominencia perdida al rotar (ver `README_nresponsive.md`): el
-   elemento más grande baja al cuadrante inferior. Una regla "el cuadrante
-   dominante no cruza el ecuador" debería recuperar ~0.12 de `composite`.
+4. Elegir la política de prominencia al rotar (ver `README_nresponsive.md`). Ya
+   están medidas tres variantes: suben `composite` de 0.613 a ~0.77 pero cuestan
+   entre 37 y 245 dp de deriva en la ida y vuelta. Es una decisión de producto
+   —reversibilidad frente a prominencia—, no una optimización pendiente.
 5. Pasar el sentido real de giro desde el sensor de rotación; hoy solo se conoce
    la orientación destino.
 6. El presupuesto de animación queda en 280 ms sobre un criterio de 300 ms. El

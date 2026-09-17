@@ -118,18 +118,40 @@ def test_rotation_keeps_critical_elements_visible(engine, template):
 
 @pytest.mark.parametrize("template", list(TEMPLATES))
 def test_round_trip_rotation_is_stable(engine, template):
-    """Girar dos veces vuelve cerca de la disposicion original."""
+    """Girar dos veces devuelve TODOS los elementos a su sitio.
+
+    Se comprueba sobre el layout completo y no solo sobre los criticos: los
+    elementos no criticos son justo los que se descolocan sin que nadie lo
+    note. Una politica de cuadrantes que dependa de donde cae el elemento
+    dominante rompe esta identidad (medido: 244 dp de deriva en media_player),
+    asi que el test la vigila.
+    """
     portrait = engine.plan(template_to_elements(template, PORTRAIT), PORTRAIT)
     landscape = engine.plan(portrait.elements, LANDSCAPE, previous=portrait)
     back = engine.plan(landscape.elements, PORTRAIT, previous=landscape)
 
     assert sorted(_ids(back)) == sorted(_ids(portrait))
-    # Los elementos criticos deben volver practicamente a su sitio.
-    drift = teleport_distance(
-        [e for e in portrait.elements if e.critical],
-        [e for e in back.elements if e.critical],
-    )
-    assert drift < 200.0, f"deriva excesiva en ida y vuelta: {drift:.1f} dp"
+    drift = teleport_distance(portrait.elements, back.elements)
+    assert drift < 0.01, f"la ida y vuelta no es identidad: {drift:.2f} dp"
+    assert {e.id: e.quadrant for e in portrait.elements} == {
+        e.id: e.quadrant for e in back.elements}, "cuadrantes no restaurados"
+
+
+@pytest.mark.parametrize("template", list(TEMPLATES))
+def test_repeated_rotation_does_not_accumulate_drift(engine, template):
+    """Veinte viajes seguidos no descolocan la disposicion."""
+    current = engine.plan(template_to_elements(template, PORTRAIT), PORTRAIT)
+    reference = {e.id: e.bounds for e in current.elements}
+
+    for _ in range(20):
+        landscape = engine.plan(current.elements, LANDSCAPE, previous=current)
+        current = engine.plan(landscape.elements, PORTRAIT, previous=landscape)
+
+    for e in current.elements:
+        ref = reference[e.id]
+        assert abs(e.bounds.x - ref.x) < 0.01 and abs(e.bounds.y - ref.y) < 0.01, (
+            f"{e.id} derivo tras 20 viajes: ({e.bounds.x:.2f},{e.bounds.y:.2f}) "
+            f"vs ({ref.x:.2f},{ref.y:.2f})")
 
 
 # --------------------------------------------------------------------------

@@ -14,7 +14,7 @@ botón de acción ni la navegación".
 
 ```bash
 # 1. Motor y tests (no requiere nada especial)
-python3 -m pytest -q                       # 22 tests
+python3 -m pytest -q                       # 24 tests
 
 # 2. Demo web; abre http://localhost:12000
 python3 -m http.server 12000 --directory web
@@ -29,7 +29,7 @@ PYTHONPATH=core python3 -m uvicorn nresponsive.api:app --port 8000
 # 5. Android
 ./scripts/setup_android_sdk.sh ~/android-sdk
 cd mobile/android && ./gradlew :app:assembleDebug
-cd mobile/android && ./gradlew :nresponsive:test     # 11 tests JVM
+cd mobile/android && ./gradlew :nresponsive:test     # 12 tests JVM
 ```
 
 ## El problema, en concreto
@@ -214,12 +214,35 @@ elemento más grande esté en el tercio superior, y al rotar el cuadrante el
 elemento grande (el `cover` o el `chart`) puede acabar abajo. En el caso medido,
 `cover` pasa de `cy=0.15H` a `cy=0.81H`.
 
-Esto no es un bug de implementación, es la consecuencia de la decisión de diseño.
-Se podría recuperar la prominencia aplicando una regla "el cuadrante dominante
-nunca baja del ecuador", y sería una mejora real. **No está implementado** porque
-no hay forma de verificarlo en este entorno más allá de las métricas propias, y
-afirmar que mejora la calidad visual sin poder mirarlo sería especular. Queda
-como el siguiente paso natural.
+### Intenté recuperarla, y no es gratis
+
+Probé tres políticas de reordenación al girar para subir la prominencia. Las tres
+lo consiguen, y las tres **rompen la identidad de ida y vuelta**:
+
+| Política | `prominence` | `composite` medio | Deriva ida-vuelta |
+| --- | --- | --- | --- |
+| Base (identidad exacta) | 0.38 | 0.613 | **0.00 dp** |
+| Espejar el dominante si cae abajo | 1.00 | 0.773 | 244.6 dp |
+| Espejar todos los no anclajes | 1.00 | 0.746 | 244.6 dp |
+| Rotar con un mapa que es involución | 1.00 | 0.775 | 36.9 dp |
+
+El motivo es estructural, no un fallo de las variantes: **la identidad exacta
+exige que la transformación sea una involución** (aplicarla dos veces devuelve al
+origen), y cualquier regla que dependa de dónde cae el elemento dominante rompe
+esa simetría al aplicarse en el sentido inverso. Comprobé que la deriva no se
+acumula — se estabiliza tras el primer viaje en 244.56 dp — pero tampoco
+desaparece. Es un intercambio real: **+0.16 de `composite` a cambio de que girar
+dos veces no devuelva la interfaz a su sitio**.
+
+Mantuve la base porque la reversibilidad es un criterio verificable y la mejora
+estética no puedo confirmarla en este entorno. Las tres variantes quedan medidas
+en esta tabla para quien prefiera el otro lado del intercambio. Queda como
+siguiente paso elegir una con criterio de producto, no por métrica.
+
+Un aviso para quien retome esto: **el test de ida y vuelta original no habría
+detectado estas regresiones**, porque solo comparaba elementos críticos con
+tolerancia de 200 dp. Lo endurecí para que cubra todos los elementos con
+tolerancia de 0.01 dp, y verifiqué que falla ante una política inestable.
 
 Sobre el sentido de giro: `_rotation_is_clockwise` lo fija por la orientación
 destino, no por el sensor. Es deliberado — así portrait → landscape → portrait es
@@ -269,7 +292,7 @@ para las alternativas antes de distribuir.
 
 Verificado en este entorno:
 
-- 22 tests Python + 11 tests Kotlin, todos verdes;
+- 24 tests Python + 12 tests Kotlin, todos verdes;
 - APK debug compila (7.9 MB);
 - paridad Python↔JS en 32 elementos y 32 transiciones;
 - rotación ida y vuelta sin deriva (0.000 dp) en las dos plantillas;

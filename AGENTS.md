@@ -63,6 +63,11 @@ background con `nohup` y hacer poll del log.
 - **`eval-reward_model_1.json` no trae logits** y `score-reward_model_1.json` sí.
   Tienen estructuras distintas. Su feedback humano no separa por geometría
   (validación agrupada ≈0.528 vs azar 0.5).
+- **El feedback humano no da para entrenar un reward head fiable.** El dataset
+  tiene 42 tamaños de canvas, pero solo 2 superan el mínimo de 100 muestras por
+  grupo, así que cualquier métrica agrupada se calcula promediando dos números.
+  `has_signal` sale `false` y `--mode gate` sale con código 2. Es el resultado
+  correcto, no un fallo a arreglar: no bajar `MIN_GROUPS_EVALUATED` para que pase.
 
 ## Licencias — leer antes de distribuir
 

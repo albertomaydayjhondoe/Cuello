@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nresponsive - demo del motor de rolling</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #2a2f3a;
+    --fg: #e8eaed;
+    --muted: #9aa3b2;
+    --accent: #4c8dff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 18px; padding: 18px 22px 40px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  button {
+    background: #222735; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 13px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* El escenario mantiene la relacion de aspecto del dispositivo y gira con el
+     mismo presupuesto de 300 ms que el plan de animacion. */
+  .stage-wrap { display: flex; justify-content: center; }
+  .stage {
+    position: relative; background: #0b0d11; border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    transition: width 300ms cubic-bezier(0.4,0,0.2,1), height 300ms cubic-bezier(0.4,0,0.2,1);
+  }
+  .el {
+    position: absolute; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; text-align: center; overflow: hidden;
+    font-size: 11px; color: rgba(255,255,255,0.95); padding: 2px;
+    /* La transicion por elemento la fija el plan (delay/duration) desde JS. */
+    transition-property: left, top, width, height;
+    transition-timing-function: cubic-bezier(0.4,0,0.2,1);
+  }
+  .el.critical { border: 2px solid rgba(255,255,255,0.9); border-radius: 16px; font-size: 13px; }
+  .gridline { position: absolute; background: rgba(76,141,255,0.16); pointer-events: none; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .metrics { margin-top: 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; }
+  .ok { color: #4ade80; }
+  .bad { color: #f87171; }
+  pre { background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; max-height: 260px; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>nresponsive &mdash; motor de rolling</h1>
+  <p>Port JS del motor de <code>core/nresponsive/rolling.py</code>. Gira el dispositivo y observa como se reasignan los cuadrantes.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="controls">
+      <strong>Plantilla:</strong>
+      <span id="templates"></span>
+      <button id="rotate">Girar dispositivo</button>
+      <button id="animate-toggle" class="active">Animacion: ON</button>
+    </div>
+    <div class="stage-wrap">
+      <div class="stage" id="stage">
+        <div class="gridline" id="vline"></div>
+        <div class="gridline" id="hline"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="card">
+    <h2>Estado</h2>
+    <dl>
+      <dt>Orientacion</dt><dd id="m-orient">-</dd>
+      <dt>Canvas (dp)</dt><dd id="m-canvas">-</dd>
+      <dt>Presupuesto</dt><dd id="m-budget">-</dd>
+      <dt>Rolling total</dt><dd id="m-total">-</dd>
+      <dt>Elementos</dt><dd id="m-count">-</dd>
+    </dl>
+    <h2 class="metrics">Metricas</h2>
+    <dl>
+      <dt>Solape</dt><dd id="m-overlap">-</dd>
+      <dt>Cobertura</dt><dd id="m-cov">-</dd>
+      <dt>Criticos visibles</dt><dd id="m-crit">-</dd>
+      <dt>Cuadrantes ocupados</dt><dd id="m-quad">-</dd>
+    </dl>
+    <h2 class="metrics">Cuadrantes</h2>
+    <dl>
+      <dt>top_left</dt><dd id="q-tl">-</dd>
+      <dt>top_right</dt><dd id="q-tr">-</dd>
+      <dt>bottom_left</dt><dd id="q-bl">-</dd>
+      <dt>bottom_right</dt><dd id="q-br">-</dd>
+    </dl>
+    <h2 class="metrics">Plan de transiciones</h2>
+    <pre id="plan">-</pre>
+  </aside>
+</main>
+
+<script type="module">
+import { plan, evaluate, BUDGET_MS } from './engine.js';
+import { instantiate, TEMPLATE_NAMES, DEFAULT_TEMPLATE } from './templates.js';
+
+const COLORS = {
+  button: '#1e88e5', nav: '#37474f', fab: '#d81b60', image: '#5e35b1',
+  text: '#455a64', input: '#00897b', list: '#6d4c41', container: '#90a4ae',
+};
+
+const stage = document.getElementById('stage');
+const vline = document.getElementById('vline');
+const hline = document.getElementById('hline');
+
+let portrait = true;
+let template = DEFAULT_TEMPLATE;
+let animate = true;
+let current = null;
+
+// Permite arrancar en apaisado con ?orientation=landscape. Es util para
+// verificar la demo de forma determinista desde fuera del navegador.
+const params = new URLSearchParams(location.search);
+if (params.get('orientation') === 'landscape') portrait = false;
+if (params.get('animate') === 'off') animate = false;
+
+const canvasFor = () => (portrait
+  ? { width: 411, height: 914 }
+  : { width: 914, height: 411 });
+
+function render(next, previous) {
+  const canvas = next.canvas;
+
+  // El escenario adopta la relacion de aspecto del dispositivo. Se limita la
+  // altura para que quepa en pantalla sin dejar de ser proporcional.
+  const maxH = 560;
+  const scale = Math.min(maxH / canvas.height, 1);
+  const W = canvas.width * scale;
+  const H = canvas.height * scale;
+  stage.style.width = `${W}px`;
+  stage.style.height = `${H}px`;
+  vline.style.cssText = `left:${W / 2}px; top:0; width:1px; height:${H}px;`;
+  hline.style.cssText = `top:${H / 2}px; left:0; height:1px; width:${W}px;`;
+
+  const planById = {};
+  next.transitions.forEach((t) => { planById[t.elementId] = t; });
+
+  // Se reutilizan los nodos existentes: si se recreasen, no habria animacion.
+  const seen = new Set();
+  next.elements.forEach((e) => {
+    seen.add(e.id);
+    let node = document.getElementById(`el-${e.id}`);
+    if (!node) {
+      node = document.createElement('div');
+      node.id = `el-${e.id}`;
+      node.className = e.critical ? 'el critical' : 'el';
+      node.style.background = COLORS[e.type] || '#666';
+      node.style.transitionDuration = '0ms';
+      stage.appendChild(node);
+    }
+    node.textContent = e.text || e.type;
+    const t = planById[e.id];
+    node.style.transitionDelay = `${animate && t ? t.delayMs : 0}ms`;
+    node.style.transitionDuration = `${animate && t ? t.durationMs : 0}ms`;
+    node.style.left = `${e.bounds.x * scale}px`;
+    node.style.top = `${e.bounds.y * scale}px`;
+    node.style.width = `${Math.max(1, e.bounds.w * scale)}px`;
+    node.style.height = `${Math.max(1, e.bounds.h * scale)}px`;
+  });
+
+  // Limpia nodos de elementos que ya no existen.
+  [...stage.querySelectorAll('.el')].forEach((n) => {
+    if (!seen.has(n.id.replace('el-', ''))) n.remove();
+  });
+
+  const m = evaluate(next);
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  set('m-orient', canvas.width > canvas.height ? 'landscape' : 'portrait');
+  set('m-canvas', `${canvas.width} x ${canvas.height}`);
+  set('m-budget', `${BUDGET_MS} ms`);
+  set('m-total', `${next.animation.totalDurationMs} ms`);
+  set('m-count', next.elements.length);
+  set('m-overlap', `${(m.overlap_ratio * 100).toFixed(2)} %`);
+  set('m-cov', `${(m.coverage_ratio * 100).toFixed(1)} %`);
+  const crit = document.getElementById('m-crit');
+  crit.textContent = m.critical_visible ? `si (${m.critical_count})` : 'NO';
+  crit.className = m.critical_visible ? 'ok' : 'bad';
+  set('m-quad', `${m.quadrant_occupancy} / 4`);
+  set('q-tl', next.quadrantMap.top_left.join(', ') || '-');
+  set('q-tr', next.quadrantMap.top_right.join(', ') || '-');
+  set('q-bl', next.quadrantMap.bottom_left.join(', ') || '-');
+  set('q-br', next.quadrantMap.bottom_right.join(', ') || '-');
+  document.getElementById('plan').textContent = next.transitions
+    .map((t) => `${t.elementId.padEnd(9)} ${t.kind.padEnd(6)} delay=${String(t.delayMs).padStart(3)}ms dur=${t.durationMs}ms`)
+    .join('\n');
+
+  // Verificacion de los criterios de aceptacion, visible en la propia pagina.
+  const idsBefore = previous ? previous.elements.map((e) => e.id).sort().join('|') : null;
+  const idsAfter = next.elements.map((e) => e.id).sort().join('|');
+  const critBefore = previous
+    ? previous.elements.filter((e) => e.critical).map((e) => e.id).sort().join('|') : null;
+  const critAfter = next.elements.filter((e) => e.critical).map((e) => e.id).sort().join('|');
+  if (previous) {
+    console.assert(idsBefore === idsAfter, 'se perdieron elementos');
+    console.assert(critBefore === critAfter, 'cambiaron los criticos');
+    console.assert(next.animation.totalDurationMs <= BUDGET_MS, 'excede el presupuesto');
+  }
+}
+
+function rebuild() {
+  const canvas = canvasFor();
+  const previous = current;
+  const elements = instantiate(template, canvas);
+  current = plan(elements, canvas, previous, `${template}-${portrait ? 'p' : 'l'}`);
+  render(current, previous);
+}
+
+// Controles de plantilla.
+const tplBox = document.getElementById('templates');
+TEMPLATE_NAMES.forEach((name) => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.className = name === template ? 'active' : '';
+  b.onclick = () => {
+    template = name;
+    [...tplBox.children].forEach((c) => c.classList.toggle('active', c.textContent === name));
+    rebuild();
+  };
+  tplBox.appendChild(b);
+});
+
+document.getElementById('rotate').onclick = () => {
+  portrait = !portrait;
+  rebuild();
+};
+
+const at = document.getElementById('animate-toggle');
+at.textContent = `Animacion: ${animate ? 'ON' : 'OFF'}`;
+at.classList.toggle('active', animate);
+at.onclick = () => {
+  animate = !animate;
+  at.textContent = `Animacion: ${animate ? 'ON' : 'OFF'}`;
+  at.classList.toggle('active', animate);
+  rebuild();
+};
+
+rebuild();
+</script>
+</body>
+</html>

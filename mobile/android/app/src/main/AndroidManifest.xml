@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Necesario solo para el modo remoto (endpoint de layout). El modo
+         por defecto corre el motor en el dispositivo, sin red. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:label="nresponsive"
+        android:theme="@style/Theme.Nresponsive"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="34">
+
+        <!-- configChanges evita que la Activity se recree al girar: es lo que
+             permite animar el rolling en lugar de saltar a un layout nuevo. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:theme="@style/Theme.Nresponsive">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

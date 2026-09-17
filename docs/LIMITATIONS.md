@@ -68,20 +68,30 @@ La lectura importante: la validación cruzada **aleatoria** da 0.6057 y parece u
 modelo decente, pero es enganosa. Los registros vienen en grupos con el mismo
 tamaño de canvas — un único canvas de 513×750 es dos tercios del dataset — y un
 split aleatorio filtra información de plantilla al conjunto de validación. Al
-retener canvas completos, la exactitud cae a 0.5279. La única señal que
-sobrevive es `overlap_ratio` (−0.164) y `alignment_score` (+0.147).
+retener canvas completos, la exactitud cae a 0.5279.
 
-Por eso `datasets/scripts/finetune_reward.py` usa validación agrupada, reporta
-ambas cifras y dispone de un modo `--mode gate` que **falla con código de salida
-distinto de cero** si el margen honesto no supera 0.02. Es preferible un script
-que se niegue a producir un modelo que uno que reporte una exactitud inflada.
+Ese 0.5279 tampoco aguanta. El dataset tiene 42 tamaños de canvas distintos, pero
+**solo 2 superan el mínimo de 100 muestras** por grupo, así que el "margen
+honesto" de +0.0279 se calcula promediando dos números: no es evidencia de que la
+geometría generalice. Las correlaciones individuales (`overlap_ratio` −0.164,
+`alignment_score` +0.147) están medidas sobre el conjunto completo, con el canvas
+dominante pesando dos tercios, así que describen esa plantilla, no una regla
+general.
+
+Por eso `datasets/scripts/finetune_reward.py` usa validación agrupada y dispone
+de un modo `--mode gate` que **falla con código de salida distinto de cero** si
+el margen no supera 0.02 **o** si se evaluaron menos de 5 grupos. En este dataset
+se cumplen ambas condiciones de fallo, y `has_signal` sale `false`. Es
+preferible un script que se niegue a producir un modelo que uno que reporte una
+exactitud inflada: la conclusión es que **estos datos no permiten entrenar un
+reward head fiable**.
 
 ## 5. Sin emulador Android
 
 `/dev/kvm` no existe en este entorno, así que no se puede arrancar un emulador y
 la demo Android no se puede ver ejecutándose aquí. Lo que sí está verificado:
 
-- el APK compila (`app-debug.apk`, 8.2 MB);
+- el APK compila (`app-debug.apk`, 7.9 MB);
 - 11 tests JVM puros del motor pasan, incluidos rotación, preservación de
   críticos, presupuesto de animación e ida y vuelta sin deriva;
 - la demo web ejecuta el mismo motor portado a JS y sí se verifica en navegador.

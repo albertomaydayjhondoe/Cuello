@@ -81,6 +81,12 @@ FEATURE_NAMES = [
 # Por debajo de este margen sobre la clase mayoritaria no hay senal util.
 MIN_SIGNAL_MARGIN = 0.02
 
+# Un margen alto promediado sobre dos grupos no es evidencia. El dataset real
+# tiene 42 tamanos de canvas distintos, pero solo 2 superan el minimo de
+# muestras por grupo; dejar fuera "un grupo" es entonces dejar fuera un tercio
+# del dataset. Sin un minimo de grupos evaluados, el gate no debe afirmar senal.
+MIN_GROUPS_EVALUATED = 5
+
 
 def features_of(layout: Layout) -> List[float]:
     """Vector de caracteristicas geometricas del layout."""
@@ -300,6 +306,21 @@ def main() -> int:
     print(f"  rmse={rep['rmse']:.4f} r2={rep['r2']:.4f} pearson={rep['pearson']:.4f}")
 
     if args.mode == "gate":
+        if grp_cv["groups_evaluated"] < MIN_GROUPS_EVALUATED:
+            print(
+                f"\nSIN SENAL: solo {grp_cv['groups_evaluated']} grupo(s) "
+                f"superan el minimo de muestras, por debajo del minimo de "
+                f"{MIN_GROUPS_EVALUATED}.\n"
+                f"El margen agrupado {grp_cv['margin']:+.4f} se calcula "
+                "promediando muy pocos grupos, asi que no es evidencia de que "
+                "la geometria generalice: el dataset tiene un canvas dominante "
+                "que es dos tercios del total.\n"
+                "No se debe reportar un modelo entrenado. Ver docs/LIMITATIONS.md.\n"
+                "Alternativa utilizable hoy: --mode heuristic (metricas "
+                "geometricas, alineadas con las restricciones del evaluador).",
+                file=sys.stderr,
+            )
+            return 2
         if grp_cv["margin"] < MIN_SIGNAL_MARGIN:
             print(
                 f"\nSIN SENAL: el margen agrupado {grp_cv['margin']:+.4f} no supera "
@@ -332,7 +353,10 @@ def main() -> int:
         "regression": rep,
         "random_cv": rand_cv,
         "group_cv": grp_cv,
-        "has_signal": bool(grp_cv["margin"] >= MIN_SIGNAL_MARGIN),
+        "has_signal": bool(
+            grp_cv["margin"] >= MIN_SIGNAL_MARGIN
+            and grp_cv["groups_evaluated"] >= MIN_GROUPS_EVALUATED
+        ),
         "notes": (
             "NO USAR EN PRODUCCION si has_signal es false. Las metricas "
             "geometricas no generalizan entre tamanos de canvas; la validacion "

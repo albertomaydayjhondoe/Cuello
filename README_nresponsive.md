@@ -14,7 +14,7 @@ botón de acción ni la navegación".
 
 ```bash
 # 1. Motor y tests (no requiere nada especial)
-python3 -m pytest -q                       # 21 tests
+python3 -m pytest -q                       # 22 tests
 
 # 2. Demo web; abre http://localhost:12000
 python3 -m http.server 12000 --directory web
@@ -239,11 +239,18 @@ python3 datasets/scripts/finetune_reward.py --mode gate      # verifica señal
 python3 datasets/scripts/finetune_reward.py --mode heuristic # puntuar sin entrenar
 ```
 
-Resultado honesto: validación cruzada aleatoria 0.6057, pero **agrupada por
-canvas 0.5279** frente a 0.5 del azar. El 0.6057 es fuga de plantilla: un único
-canvas de 513×750 es dos tercios del dataset. El modo `gate` falla a propósito
-cuando no hay señal suficiente. Detalle completo en
-[docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+Resultado honesto: la validación cruzada aleatoria da 0.6057, que es fuga de
+plantilla y no significa nada. La agrupada por canvas da 0.5279 frente a 0.5 del
+azar, un margen de +0.0279 que **suena** a señal.
+
+No lo es, y el gate lo rechaza (`exit 2`). El motivo es la cobertura: el dataset
+tiene 42 tamaños de canvas distintos, pero **solo 2 superan el mínimo de 100
+muestras** por grupo. Un margen promediado sobre dos grupos no es evidencia; el
+canal dominante, 513×750, es dos tercios del total. El gate exige ahora un mínimo
+de 5 grupos evaluados además del margen, así que `has_signal` sale `false`.
+
+En una frase: **no hay señal fiable en este dataset**, y el código lo dice en vez
+de disimularlo. Detalle completo en [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ## Licencias
 
@@ -262,9 +269,11 @@ para las alternativas antes de distribuir.
 
 Verificado en este entorno:
 
-- 21 tests Python + 11 tests Kotlin, todos verdes;
-- APK debug compila (8.2 MB);
-- paridad Python↔JS en 32 elementos.
+- 22 tests Python + 11 tests Kotlin, todos verdes;
+- APK debug compila (7.9 MB);
+- paridad Python↔JS en 32 elementos y 32 transiciones;
+- rotación ida y vuelta sin deriva (0.000 dp) en las dos plantillas;
+- animación en 280 ms sobre un criterio de menos de 300 ms.
 
 No verificado: la demo Android ejecutándose. Este entorno no tiene `/dev/kvm`,
 así que no se puede arrancar un emulador. La demo web cubre esa carencia
